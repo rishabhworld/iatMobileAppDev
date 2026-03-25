@@ -20,7 +20,7 @@ export default function App() {
   return (
     <View style={styles.container}>
 
-      {console.log("App() function returns something")}
+      {/* {console.log("App() function returns something")} */}
 
       <Text style={styles.redHeader}>
         Varshu, Open up App.tsx to start working on your app!
