@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, Button, StyleSheet, Modal, TextInput, TouchableOpacity, ScrollView } from 'react-native'
+import { SafeAreaView, View, Text, Button, StyleSheet, Modal, TextInput, TouchableOpacity, ScrollView, Platform, StatusBar } from 'react-native'
 
 let AsyncStorage: any = null
 
@@ -26,6 +26,7 @@ const ALL_REGIONS = [
 const REGION_KEY = 'nswHazardRegions'
 const STREET_KEY = 'nswHazardStreets'
 const INCIDENT_KEY = 'nswHazardIncidents'
+const TOP_SAFE_PADDING = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 12 : 12
 
 
 export default function App() {
@@ -37,7 +38,6 @@ export default function App() {
 
   // modal and dropdown open/close
   const [filterModalVisible, setFilterModalVisible] = useState(false)
-  const [regionDropdownVisible, setRegionDropdownVisible] = useState(false)
 
   // search text inside filter UI
   const [regionSearch, setRegionSearch] = useState('')
@@ -312,9 +312,11 @@ export default function App() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Loading...</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.title}>Loading...</Text>
+        </View>
+      </SafeAreaView>
     )
   }
 
@@ -325,267 +327,274 @@ export default function App() {
   // show only latest 4 cards
   const totalHazards = features.length
   const latestFour = features.slice(0, 4)
+  const hasActiveFilters = Boolean(activeRegion || activeStreet || activeIncident)
+
+  const clearAllFilters = () => {
+    setRegionSearch('')
+    setStreetSearch('')
+    setIncidentSearch('')
+    setSelectedRegion('')
+    setSelectedStreet('')
+    setSelectedIncident('')
+    setActiveRegion('')
+    setActiveStreet('')
+    setActiveIncident('')
+    fetchData('', '', '')
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>NSW Transport Hazards</Text>
-      {activeRegion ? <Text style={styles.infoLabel}>📍 Region: {activeRegion}</Text> : null}
-      {activeStreet ? <Text style={styles.infoLabel}>🛣️ Street: {activeStreet}</Text> : null}
-      {activeIncident ? <Text style={styles.infoLabel}>⚠️ Incident: {activeIncident}</Text> : null}
-
-      <View style={styles.dropdownContainer}>
-        {/* quick region dropdown */}
-        <TouchableOpacity
-          style={styles.dropdownTrigger}
-          onPress={() => setRegionDropdownVisible(!regionDropdownVisible)}
-        >
-          <Text style={styles.dropdownTriggerText}>
-            Region: {selectedRegion || 'All'} {regionDropdownVisible ? '▲' : '▼'}
-          </Text>
-        </TouchableOpacity>
-        {regionDropdownVisible && (
-          <View style={styles.dropdownBox}>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Search region..."
-              value={regionSearch}
-              onChangeText={setRegionSearch}
-              autoCapitalize="none"
-            />
-            <ScrollView style={styles.dropdownList}>
-              {regionOptions
-                .filter((region) =>
-                  region.toLowerCase().includes(regionSearch.toLowerCase()),
-                )
-                .map((region) => (
-                  <TouchableOpacity
-                    key={region}
-                    style={
-                      selectedRegion === region
-                        ? styles.regionOptionSelected
-                        : styles.regionOption
-                    }
-                    onPress={() => {
-                      setSelectedRegion(region)
-                      setActiveRegion(region)
-                      setRegionDropdownVisible(false)
-                      fetchData(region, selectedStreet, selectedIncident)
-                    }}
-                  >
-                    <Text>
-                      {region}
-                      {selectedRegion === region ? ' ✓' : ''}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-            </ScrollView>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.buttonRow}>
-        <Button title="Get Hazards" onPress={() => fetchData(selectedRegion, selectedStreet, selectedIncident)} />
-        <TouchableOpacity style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
-          <Text style={styles.filterButtonText}>Filters</Text>
-        </TouchableOpacity>
-      </View>
-
-      {error ? (
-        <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
-
-      <Modal
-        visible={filterModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setFilterModalVisible(false)}
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.modalBackground}>
-          <View style={styles.modalContainer}>
-            {/* main filter modal */}
-            <Text style={styles.modalTitle}>Filter by Region + Street + Incident</Text>
+        <Text style={styles.title}>NSW Transport Hazards</Text>
 
-            <Text style={styles.modalSectionTitle}>Region</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Search region..."
-              value={regionSearch}
-              onChangeText={setRegionSearch}
-              autoCapitalize="none"
-            />
-            <ScrollView style={[styles.dropdownList, { maxHeight: 130 }]}>
-              {regionOptions
-                .filter((region) =>
-                  region.toLowerCase().includes(regionSearch.toLowerCase()),
-                )
-                .map((region) => (
-                  <TouchableOpacity
-                    key={region}
-                    style={
-                      selectedRegion === region
-                        ? styles.regionOptionSelected
-                        : styles.regionOption
-                    }
-                    onPress={() => setSelectedRegion(region)}
-                  >
-                    <Text>
-                      {region}
-                      {selectedRegion === region ? ' ✓' : ''}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-            </ScrollView>
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={styles.actionButtonPrimary}
+            onPress={() => fetchData(selectedRegion, selectedStreet, selectedIncident)}
+          >
+            <Text style={styles.actionButtonText}>🚨 Check Latest Hazards</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButtonSecondary} onPress={() => setFilterModalVisible(true)}>
+            <Text style={styles.actionButtonText}>⚙️ Filters</Text>
+          </TouchableOpacity>
+        </View>
 
-            <Text style={styles.modalSectionTitle}>Street</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Search street..."
-              value={streetSearch}
-              onChangeText={setStreetSearch}
-              autoCapitalize="none"
-            />
-            <ScrollView style={[styles.dropdownList, { maxHeight: 130 }]}>
-              {streetOptions
-                .filter((street) =>
-                  street.toLowerCase().includes(streetSearch.toLowerCase()),
-                )
-                .map((street) => (
-                  <TouchableOpacity
-                    key={street}
-                    style={
-                      selectedStreet === street
-                        ? styles.regionOptionSelected
-                        : styles.regionOption
-                    }
-                    onPress={() => setSelectedStreet(street)}
-                  >
-                    <Text>
-                      {street}
-                      {selectedStreet === street ? ' ✓' : ''}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-            </ScrollView>
+        <View style={styles.filterSummaryRow}>
+          <View style={styles.filterChipsWrap}>
+            {activeRegion ? (
+              <View style={styles.filterChip}>
+                <Text style={styles.filterChipText}>📍 Region: {activeRegion}</Text>
+              </View>
+            ) : null}
+            {activeStreet ? (
+              <View style={styles.filterChip}>
+                <Text style={styles.filterChipText}>🛣️ Street: {activeStreet}</Text>
+              </View>
+            ) : null}
+            {activeIncident ? (
+              <View style={styles.filterChip}>
+                <Text style={styles.filterChipText}>⚠️ Incident: {activeIncident}</Text>
+              </View>
+            ) : null}
+            {!hasActiveFilters ? (
+              <Text style={styles.filterSummaryHint}>No filters selected</Text>
+            ) : null}
+          </View>
 
-            <Text style={styles.modalSectionTitle}>Incident</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Search incident kind..."
-              value={incidentSearch}
-              onChangeText={setIncidentSearch}
-              autoCapitalize="none"
-            />
-            <ScrollView style={[styles.dropdownList, { maxHeight: 130 }]}>
-              {incidentOptions
-                .filter((incident) =>
-                  incident.toLowerCase().includes(incidentSearch.toLowerCase()),
-                )
-                .map((incident) => (
-                  <TouchableOpacity
-                    key={incident}
-                    style={
-                      selectedIncident === incident
-                        ? styles.regionOptionSelected
-                        : styles.regionOption
-                    }
-                    onPress={() => setSelectedIncident(incident)}
-                  >
-                    <Text>
-                      {incident}
-                      {selectedIncident === incident ? ' ✓' : ''}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-            </ScrollView>
+          {hasActiveFilters ? (
+            <TouchableOpacity style={styles.clearFiltersButton} onPress={clearAllFilters}>
+              <Text style={styles.clearFiltersButtonText}>Clear Filters</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-            <View style={styles.modalActions}>
-              {/* apply / clear buttons */}
-              <Button
-                title="Apply"
-                onPress={() => {
-                  const chosenRegion = selectedRegion || regionSearch
-                  const chosenStreet = selectedStreet || streetSearch
-                  const chosenIncident = selectedIncident || incidentSearch
-                  setFilterModalVisible(false)
-                  setActiveRegion(chosenRegion)
-                  setActiveStreet(chosenStreet)
-                  setActiveIncident(chosenIncident)
-                  fetchData(chosenRegion, chosenStreet, chosenIncident)
-                }}
+        {error ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
+        <Modal
+          visible={filterModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setFilterModalVisible(false)}
+        >
+          <View style={styles.modalBackground}>
+            <View style={styles.modalContainer}>
+              {/* main filter modal */}
+              <Text style={styles.modalTitle}>Filter by Region + Street + Incident</Text>
+
+              <Text style={styles.modalSectionTitle}>Region</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Search region..."
+                value={regionSearch}
+                onChangeText={setRegionSearch}
+                autoCapitalize="none"
               />
-              <Button
-                title="Clear"
-                onPress={() => {
-                  setRegionSearch('')
-                  setStreetSearch('')
-                  setIncidentSearch('')
-                  setSelectedRegion('')
-                  setSelectedStreet('')
-                  setSelectedIncident('')
-                  setActiveRegion('')
-                  setActiveStreet('')
-                  setActiveIncident('')
-                  setFilterModalVisible(false)
-                  fetchData('', '', '')
-                }}
+              <ScrollView style={[styles.dropdownList, { maxHeight: 130 }]}>
+                {regionOptions
+                  .filter((region) =>
+                    region.toLowerCase().includes(regionSearch.toLowerCase()),
+                  )
+                  .map((region) => (
+                    <TouchableOpacity
+                      key={region}
+                      style={
+                        selectedRegion === region
+                          ? styles.regionOptionSelected
+                          : styles.regionOption
+                      }
+                      onPress={() => setSelectedRegion(region)}
+                    >
+                      <Text>
+                        {region}
+                        {selectedRegion === region ? ' ✓' : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+
+              <Text style={styles.modalSectionTitle}>Street</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Search street..."
+                value={streetSearch}
+                onChangeText={setStreetSearch}
+                autoCapitalize="none"
               />
+              <ScrollView style={[styles.dropdownList, { maxHeight: 130 }]}>
+                {streetOptions
+                  .filter((street) =>
+                    street.toLowerCase().includes(streetSearch.toLowerCase()),
+                  )
+                  .map((street) => (
+                    <TouchableOpacity
+                      key={street}
+                      style={
+                        selectedStreet === street
+                          ? styles.regionOptionSelected
+                          : styles.regionOption
+                      }
+                      onPress={() => setSelectedStreet(street)}
+                    >
+                      <Text>
+                        {street}
+                        {selectedStreet === street ? ' ✓' : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+
+              <Text style={styles.modalSectionTitle}>Incident</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Search incident kind..."
+                value={incidentSearch}
+                onChangeText={setIncidentSearch}
+                autoCapitalize="none"
+              />
+              <ScrollView style={[styles.dropdownList, { maxHeight: 130 }]}>
+                {incidentOptions
+                  .filter((incident) =>
+                    incident.toLowerCase().includes(incidentSearch.toLowerCase()),
+                  )
+                  .map((incident) => (
+                    <TouchableOpacity
+                      key={incident}
+                      style={
+                        selectedIncident === incident
+                          ? styles.regionOptionSelected
+                          : styles.regionOption
+                      }
+                      onPress={() => setSelectedIncident(incident)}
+                    >
+                      <Text>
+                        {incident}
+                        {selectedIncident === incident ? ' ✓' : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+
+              <View style={styles.modalActions}>
+                {/* apply / clear buttons */}
+                <Button
+                  title="Apply"
+                  onPress={() => {
+                    const chosenRegion = selectedRegion || regionSearch
+                    const chosenStreet = selectedStreet || streetSearch
+                    const chosenIncident = selectedIncident || incidentSearch
+                    setFilterModalVisible(false)
+                    setActiveRegion(chosenRegion)
+                    setActiveStreet(chosenStreet)
+                    setActiveIncident(chosenIncident)
+                    fetchData(chosenRegion, chosenStreet, chosenIncident)
+                  }}
+                />
+                <Button
+                  title="Clear"
+                  onPress={() => {
+                    setFilterModalVisible(false)
+                    clearAllFilters()
+                  }}
+                />
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {totalHazards > 0 ? (
-        <View style={styles.result}>
-          {/* summary + latest cards */}
-          <Text style={styles.infoLabel}>🚨 Total Hazards: {totalHazards}</Text>
-          <Text style={styles.sectionTitle}>Latest 4 Incidents</Text>
-          <View style={styles.incidentFlexList}>
-            {latestFour.map((item: any, index: number) => {
-              const itemProps = item?.properties || {}
-              const itemRoad = itemProps?.roads?.[0] || {}
-              return (
-                <View key={`incident-${index}`} style={styles.incidentCard}>
-                  <Text style={styles.incidentCardTitle}>#{index + 1} {itemProps.displayName ?? 'N/A'}</Text>
-                  <Text style={styles.incidentCardText}>🗂️ Category: {itemProps.mainCategory ?? 'N/A'}</Text>
-                  <Text style={styles.incidentCardText}>⚠️ Kind: {itemProps.incidentKind ?? 'N/A'}</Text>
-                  <Text style={styles.incidentCardText}>📍 Region: {itemRoad.region ?? 'N/A'}</Text>
-                  <Text style={styles.incidentCardText}>🏘️ Suburb: {itemRoad.suburb ?? 'N/A'}</Text>
-                  <Text style={styles.incidentCardText}>🛣️ Main St: {itemRoad.mainStreet ?? 'N/A'}</Text>
-                </View>
-              )
-            })}
+        {totalHazards > 0 ? (
+          <View style={styles.result}>
+            {/* summary + latest cards */}
+            <Text style={styles.infoLabel}>🚨 Total Hazards: {totalHazards}</Text>
+            <Text style={styles.sectionTitle}>Latest 4 Incidents</Text>
+            <View style={styles.incidentFlexList}>
+              {latestFour.map((item: any, index: number) => {
+                const itemProps = item?.properties || {}
+                const itemRoad = itemProps?.roads?.[0] || {}
+                return (
+                  <View key={`incident-${index}`} style={styles.incidentCard}>
+                    <Text style={styles.incidentCardTitle}>#{index + 1} {itemProps.displayName ?? 'N/A'}</Text>
+                    <Text style={styles.incidentCardText}>🗂️ Category: {itemProps.mainCategory ?? 'N/A'}</Text>
+                    <Text style={styles.incidentCardText}>⚠️ Kind: {itemProps.incidentKind ?? 'N/A'}</Text>
+                    <Text style={styles.incidentCardText}>📍 Region: {itemRoad.region ?? 'N/A'}</Text>
+                    <Text style={styles.incidentCardText}>🏘️ Suburb: {itemRoad.suburb ?? 'N/A'}</Text>
+                    <Text style={styles.incidentCardText}>🛣️ Main St: {itemRoad.mainStreet ?? 'N/A'}</Text>
+                  </View>
+                )
+              })}
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {debugInfo ? (
-        <View style={styles.debugBox}>
-          <Text style={styles.debugText}>{debugInfo}</Text>
-        </View>
-      ) : null}
-    </View>
+        {debugInfo ? (
+          <View style={styles.debugBox}>
+            <Text style={styles.debugText}>{debugInfo}</Text>
+          </View>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  scrollContent: {
     padding: 20,
+    paddingTop: TOP_SAFE_PADDING,
+    paddingBottom: 32,
+  },
+  loadingContainer: {
+    flex: 1,
+    padding: 20,
+    paddingTop: TOP_SAFE_PADDING,
     justifyContent: 'center',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
+    marginTop: 4,
     marginBottom: 20,
   },
   result: {
     marginTop: 20,
     padding: 15,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    backgroundColor: '#eef4ff',
+    borderRadius: 16,
   },
   infoLabel: {
     fontSize: 16,
@@ -608,21 +617,30 @@ const styles = StyleSheet.create({
   incidentCard: {
     width: '48%',
     backgroundColor: '#ffffff',
-    borderRadius: 8,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#dde7f5',
-    padding: 10,
+    borderColor: '#c8d9f2',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    shadowColor: '#163a70',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
   },
   incidentCardTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#1c355e',
-    marginBottom: 6,
+    color: '#102a43',
+    marginBottom: 8,
+    lineHeight: 18,
   },
   incidentCardText: {
     fontSize: 12,
-    color: '#2d3a4a',
-    marginBottom: 4,
+    fontWeight: '500',
+    color: '#334e68',
+    marginBottom: 6,
+    lineHeight: 16,
   },
   errorBox: {
     marginTop: 20,
@@ -645,22 +663,89 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  buttonRow: {
+  actionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
+    columnGap: 12,
   },
-  filterButton: {
-    paddingVertical: 10,
+  actionButtonPrimary: {
+    flex: 1.25,
+    backgroundColor: '#1c91e6',
+    borderRadius: 16,
+    paddingVertical: 16,
     paddingHorizontal: 14,
-    backgroundColor: '#0077cc',
-    borderRadius: 8,
-    marginLeft: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#1c91e6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  filterButtonText: {
+  actionButtonSecondary: {
+    flex: 0.9,
+    backgroundColor: '#0f7cc9',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0f7cc9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  actionButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+  },
+  filterSummaryRow: {
+    marginTop: 14,
+    marginBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    columnGap: 10,
+  },
+  filterChipsWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    backgroundColor: '#eef6ff',
+    borderWidth: 1,
+    borderColor: '#c8ddf5',
+    borderRadius: 999,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1d4f7a',
+  },
+  filterSummaryHint: {
+    fontSize: 13,
+    color: '#6b7c93',
+    paddingTop: 8,
+  },
+  clearFiltersButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#d0dbe8',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  clearFiltersButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f5f9d',
   },
   modalBackground: {
     flex: 1,
